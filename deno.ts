@@ -1,5 +1,5 @@
-// 导入 deno-dom 用于 XML 解析
-import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
+// 导入 xml-js 用于 XML 解析
+import { xml2js } from "https://deno.land/x/xml2js@1.0.0/mod.ts";
 
 // 配置
 const proxySwitch = false; // 是否使用代理
@@ -19,9 +19,22 @@ const userAgents = [
 ];
 
 // 辅助函数：提取CDATA和普通文本
-function getCdataValue(node: Element | null): string {
+function getCdataValue(node: any): string {
     if (!node) return '';
-    return node.textContent.trim();
+    
+    if (typeof node === 'string') {
+        return node.trim();
+    }
+    
+    if (node._text) {
+        return node._text.trim();
+    }
+    
+    if (node._cdata) {
+        return node._cdata.trim();
+    }
+    
+    return '';
 }
 
 // 简单拼音转换函数
@@ -49,21 +62,27 @@ function pinyinConvert(text: string): string {
 }
 
 // XML解析函数
-async function parseXml(xmlString: string): Promise<Document> {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-    
-    if (!xmlDoc) {
-        throw new Error("Failed to parse XML document");
+async function parseXml(xmlString: string): Promise<any> {
+    try {
+        const result = await xml2js(xmlString, { 
+            compact: true,
+            ignoreDeclaration: true,
+            ignoreInstruction: true,
+            ignoreAttributes: false,
+            ignoreComment: true,
+            ignoreDoctype: true
+        });
+        
+        return result;
+    } catch (error) {
+        throw new Error(`XML Parse Error: ${error.message}`);
     }
-    
-    // 检查错误
-    const parserError = xmlDoc.querySelector("parsererror");
-    if (parserError) {
-        throw new Error(`XML Parse Error: ${parserError.textContent}`);
-    }
-    
-    return xmlDoc;
+}
+
+// 获取节点属性值
+function getAttributeValue(node: any, attrName: string): string {
+    if (!node || !node._attributes) return '';
+    return node._attributes[attrName] || '';
 }
 
 // 处理请求
@@ -115,9 +134,9 @@ async function handleRequest(request: Request): Promise<Response> {
         }
 
         // 解析 XML
-        let xmlDoc;
+        let xmlData;
         try {
-            xmlDoc = await parseXml(responseText);
+            xmlData = await parseXml(responseText);
         } catch (error) {
             console.log(`XML Parse Error: ${error.message}`);
             console.log(`Response content: ${responseText.substring(0, 500)}...`);
@@ -137,13 +156,13 @@ async function handleRequest(request: Request): Promise<Response> {
         
         switch (ac) {
             case 'videolist':
-                jsonResponse = await processVideoList(xmlDoc);
+                jsonResponse = await processVideoList(xmlData);
                 break;
             case 'list':
-                jsonResponse = await processList(xmlDoc);
+                jsonResponse = await processList(xmlData);
                 break;
             case 'detail':
-                jsonResponse = await processDetail(xmlDoc);
+                jsonResponse = await processDetail(xmlData);
                 break;
             default:
                 jsonResponse = {
@@ -168,24 +187,24 @@ async function handleRequest(request: Request): Promise<Response> {
     }
 }
 
-async function processVideoList(xmlDoc: Document): Promise<any> {
-    const list = xmlDoc.querySelector("list");
-    const videos = xmlDoc.querySelectorAll("video");
+async function processVideoList(xmlData: any): Promise<any> {
+    const list = xmlData.list;
+    const videos = Array.isArray(list.video) ? list.video : [list.video];
     
     const result = {
         "code": 1,
         "msg": "数据列表",
-        "page": list?.getAttribute("page") || "1",
-        "pagecount": parseInt(list?.getAttribute("pagecount") || "0"),
-        "limit": list?.getAttribute("pagesize") || "20",
-        "total": parseInt(list?.getAttribute("recordcount") || "0"),
+        "page": getAttributeValue(list, 'page') || "1",
+        "pagecount": parseInt(getAttributeValue(list, 'pagecount') || "0"),
+        "limit": getAttributeValue(list, 'pagesize') || "20",
+        "total": parseInt(getAttributeValue(list, 'recordcount') || "0"),
         "list": [] as any[]
     };
 
     for (const video of videos) {
-        const name = getCdataValue(video.querySelector("name"));
-        const dt = video.querySelector("dt");
-        const dl = video.querySelector("dl");
+        const name = getCdataValue(video.name);
+        const dt = video.dt;
+        const dl = video.dl;
         
         let playFrom = '';
         let playUrl = '';
@@ -193,14 +212,14 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
         if (dt) {
             playFrom = getCdataValue(dt);
         } else if (dl) {
-            const dd = dl.querySelector("dd");
+            const dd = dl.dd;
             if (dd) {
-                playFrom = dd.getAttribute("flag") || '';
+                playFrom = getAttributeValue(dd, 'flag') || '';
             }
         }
         
         if (dl) {
-            const dd = dl.querySelector("dd");
+            const dd = dl.dd;
             if (dd) {
                 playUrl = getCdataValue(dd);
             }
@@ -215,38 +234,38 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
         }
         
         const item = {
-            "vod_id": parseInt(video.querySelector("id")?.textContent || "0"),
-            "type_id": parseInt(video.querySelector("tid")?.textContent || "0"),
+            "vod_id": parseInt(getCdataValue(video.id) || "0"),
+            "type_id": parseInt(getCdataValue(video.tid) || "0"),
             "type_id_1": 2,
             "group_id": 0,
             "vod_name": name,
-            "vod_sub": getCdataValue(video.querySelector("des")),
+            "vod_sub": getCdataValue(video.des),
             "vod_en": pinyinConvert(name),
             "vod_status": 1,
             "vod_letter": firstLetter,
             "vod_color": "",
             "vod_tag": "",
             "vod_class": "",
-            "vod_pic": getCdataValue(video.querySelector("pic")),
+            "vod_pic": getCdataValue(video.pic),
             "vod_pic_thumb": "",
             "vod_pic_slide": "",
             "vod_pic_screenshot": "",
-            "vod_actor": getCdataValue(video.querySelector("actor")),
-            "vod_director": getCdataValue(video.querySelector("director")),
+            "vod_actor": getCdataValue(video.actor),
+            "vod_director": getCdataValue(video.director),
             "vod_writer": "",
             "vod_behind": "",
-            "vod_blurb": getCdataValue(video.querySelector("des")),
-            "vod_remarks": getCdataValue(video.querySelector("note")),
-            "vod_pubdate": getCdataValue(video.querySelector("year")),
+            "vod_blurb": getCdataValue(video.des),
+            "vod_remarks": getCdataValue(video.note),
+            "vod_pubdate": getCdataValue(video.year),
             "vod_total": 0,
             "vod_serial": "0",
             "vod_tv": "",
             "vod_weekday": "",
-            "vod_area": getCdataValue(video.querySelector("area")),
-            "vod_lang": getCdataValue(video.querySelector("lang")),
-            "vod_year": getCdataValue(video.querySelector("year")),
+            "vod_area": getCdataValue(video.area),
+            "vod_lang": getCdataValue(video.lang),
+            "vod_year": getCdataValue(video.year),
             "vod_version": "",
-            "vod_state": getCdataValue(video.querySelector("state")),
+            "vod_state": getCdataValue(video.state),
             "vod_author": "",
             "vod_jumpurl": "",
             "vod_tpl": "",
@@ -269,7 +288,7 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
             "vod_score": "6.0",
             "vod_score_all": 7280,
             "vod_score_num": 728,
-            "vod_time": getCdataValue(video.querySelector("last")),
+            "vod_time": getCdataValue(video.last),
             "vod_time_add": Math.floor(Date.now() / 1000),
             "vod_time_hits": 0,
             "vod_time_make": 0,
@@ -285,7 +304,7 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
             "vod_pwd_play_url": "",
             "vod_pwd_down": "",
             "vod_pwd_down_url": "",
-            "vod_content": getCdataValue(video.querySelector("des")),
+            "vod_content": getCdataValue(video.des),
             "vod_play_from": playFrom,
             "vod_play_server": "",
             "vod_play_note": "",
@@ -297,7 +316,7 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
             "vod_plot": 0,
             "vod_plot_name": "",
             "vod_plot_detail": "",
-            "type_name": getCdataValue(video.querySelector("type"))
+            "type_name": getCdataValue(video.type)
         };
         
         result.list.push(item);
@@ -306,50 +325,50 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
     return result;
 }
 
-async function processList(xmlDoc: Document): Promise<any> {
-    const list = xmlDoc.querySelector("list");
-    const videos = xmlDoc.querySelectorAll("video");
-    const classTypes = xmlDoc.querySelectorAll("ty");
+async function processList(xmlData: any): Promise<any> {
+    const list = xmlData.list;
+    const videos = Array.isArray(list.video) ? list.video : [list.video];
+    const classTypes = Array.isArray(xmlData.class.ty) ? xmlData.class.ty : [xmlData.class.ty];
     
     const result = {
         "code": 1,
         "msg": "数据列表",
-        "page": list?.getAttribute("page") || "1",
-        "pagecount": parseInt(list?.getAttribute("pagecount") || "0"),
-        "limit": list?.getAttribute("pagesize") || "20",
-        "total": parseInt(list?.getAttribute("recordcount") || "0"),
+        "page": getAttributeValue(list, 'page') || "1",
+        "pagecount": parseInt(getAttributeValue(list, 'pagecount') || "0"),
+        "limit": getAttributeValue(list, 'pagesize') || "20",
+        "total": parseInt(getAttributeValue(list, 'recordcount') || "0"),
         "list": [] as any[],
         "class": [] as any[]
     };
 
     for (const video of videos) {
-        const name = getCdataValue(video.querySelector("name"));
+        const name = getCdataValue(video.name);
         result.list.push({
-            "vod_id": parseInt(video.querySelector("id")?.textContent || "0"),
+            "vod_id": parseInt(getCdataValue(video.id) || "0"),
             "vod_name": name,
-            "type_id": parseInt(video.querySelector("tid")?.textContent || "0"),
-            "type_name": getCdataValue(video.querySelector("type")),
+            "type_id": parseInt(getCdataValue(video.tid) || "0"),
+            "type_name": getCdataValue(video.type),
             "vod_en": pinyinConvert(name),
-            "vod_time": getCdataValue(video.querySelector("last")),
-            "vod_remarks": getCdataValue(video.querySelector("note")),
-            "vod_play_from": getCdataValue(video.querySelector("dt"))
+            "vod_time": getCdataValue(video.last),
+            "vod_remarks": getCdataValue(video.note),
+            "vod_play_from": getCdataValue(video.dt)
         });
     }
 
     for (const type of classTypes) {
         result.class.push({
-            "type_id": parseInt(type.getAttribute("id") || "0"),
+            "type_id": parseInt(getAttributeValue(type, 'id') || "0"),
             "type_pid": 0,
-            "type_name": type.textContent.trim()
+            "type_name": getCdataValue(type)
         });
     }
     
     return result;
 }
 
-async function processDetail(xmlDoc: Document): Promise<any> {
-    const list = xmlDoc.querySelector("list");
-    const videos = xmlDoc.querySelectorAll("video");
+async function processDetail(xmlData: any): Promise<any> {
+    const list = xmlData.list;
+    const videos = Array.isArray(list.video) ? list.video : [list.video];
     
     const result = {
         "code": 1,
@@ -362,9 +381,9 @@ async function processDetail(xmlDoc: Document): Promise<any> {
     };
 
     for (const video of videos) {
-        const name = getCdataValue(video.querySelector("name"));
-        const dt = video.querySelector("dt");
-        const dl = video.querySelector("dl");
+        const name = getCdataValue(video.name);
+        const dt = video.dt;
+        const dl = video.dl;
         
         let playFrom = '';
         let playUrl = '';
@@ -372,14 +391,14 @@ async function processDetail(xmlDoc: Document): Promise<any> {
         if (dt) {
             playFrom = getCdataValue(dt);
         } else if (dl) {
-            const dd = dl.querySelector("dd");
+            const dd = dl.dd;
             if (dd) {
-                playFrom = dd.getAttribute("flag") || '';
+                playFrom = getAttributeValue(dd, 'flag') || '';
             }
         }
         
         if (dl) {
-            const dd = dl.querySelector("dd");
+            const dd = dl.dd;
             if (dd) {
                 playUrl = getCdataValue(dd);
             }
@@ -394,8 +413,8 @@ async function processDetail(xmlDoc: Document): Promise<any> {
         }
         
         const item = {
-            "vod_id": parseInt(video.querySelector("id")?.textContent || "0"),
-            "type_id": parseInt(video.querySelector("tid")?.textContent || "0"),
+            "vod_id": parseInt(getCdataValue(video.id) || "0"),
+            "type_id": parseInt(getCdataValue(video.tid) || "0"),
             "type_id_1": 2,
             "group_id": 0,
             "vod_name": name,
@@ -406,26 +425,26 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_color": "",
             "vod_tag": "",
             "vod_class": "",
-            "vod_pic": getCdataValue(video.querySelector("pic")),
+            "vod_pic": getCdataValue(video.pic),
             "vod_pic_thumb": "",
             "vod_pic_slide": "",
             "vod_pic_screenshot": "",
-            "vod_actor": getCdataValue(video.querySelector("actor")),
-            "vod_director": getCdataValue(video.querySelector("director")),
+            "vod_actor": getCdataValue(video.actor),
+            "vod_director": getCdataValue(video.director),
             "vod_writer": "",
             "vod_behind": "",
-            "vod_blurb": getCdataValue(video.querySelector("des")),
-            "vod_remarks": getCdataValue(video.querySelector("note")),
-            "vod_pubdate": getCdataValue(video.querySelector("year")),
+            "vod_blurb": getCdataValue(video.des),
+            "vod_remarks": getCdataValue(video.note),
+            "vod_pubdate": getCdataValue(video.year),
             "vod_total": 0,
             "vod_serial": "0",
             "vod_tv": "",
             "vod_weekday": "",
-            "vod_area": getCdataValue(video.querySelector("area")),
-            "vod_lang": getCdataValue(video.querySelector("lang")),
-            "vod_year": getCdataValue(video.querySelector("year")),
+            "vod_area": getCdataValue(video.area),
+            "vod_lang": getCdataValue(video.lang),
+            "vod_year": getCdataValue(video.year),
             "vod_version": "",
-            "vod_state": getCdataValue(video.querySelector("state")),
+            "vod_state": getCdataValue(video.state),
             "vod_author": "",
             "vod_jumpurl": "",
             "vod_tpl": "",
@@ -448,7 +467,7 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_score": "6.0",
             "vod_score_all": 7280,
             "vod_score_num": 728,
-            "vod_time": getCdataValue(video.querySelector("last")),
+            "vod_time": getCdataValue(video.last),
             "vod_time_add": Math.floor(Date.now() / 1000),
             "vod_time_hits": 0,
             "vod_time_make": 0,
@@ -464,7 +483,7 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_pwd_play_url": "",
             "vod_pwd_down": "",
             "vod_pwd_down_url": "",
-            "vod_content": getCdataValue(video.querySelector("des")),
+            "vod_content": getCdataValue(video.des),
             "vod_play_from": playFrom,
             "vod_play_server": "",
             "vod_play_note": "",
@@ -476,7 +495,7 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_plot": 0,
             "vod_plot_name": "",
             "vod_plot_detail": "",
-            "type_name": getCdataValue(video.querySelector("type"))
+            "type_name": getCdataValue(video.type)
         };
         
         result.list.push(item);
