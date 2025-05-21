@@ -2,7 +2,7 @@
 
 // 配置
 $proxySwitch = true; // 是否使用代理
-$proxyUrl = 'https://yourproxyurl/'; // 代理地址
+$proxyUrl = 'https://proxyurl/'; // 代理地址
 $proxyUrlEncode = false; // 代理是否支持URL编码
 
 // 日志函数
@@ -24,10 +24,36 @@ $userAgents = [
     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
 ];
 
+function getTargetUrl() {
+    $url = isset($_GET['apiurl']) ? urldecode($_GET['apiurl']) : null;
+
+    // 如果 URL 参数为空，尝试从 REQUEST_URI 中提取
+    if (empty($url)) {
+        $path = $_SERVER['REQUEST_URI'] ?? '';
+        if (preg_match('/\/apiurl\/([^?]+)/', $path, $matches)) {
+            $url = $matches[1];
+            // 先对提取的部分进行 URL 解码
+            $url = urldecode($url);
+        }
+    }
+
+    // 如果 URL 仍然为空，返回 null
+    if (empty($url)) {
+        return null;
+    }
+
+    // 移除 URL 中的查询参数
+    $url = strtok($url, '?');
+
+    return $url;
+}
+
 // 获取请求参数
-$apiUrl = isset($_GET['apiurl']) ? urldecode($_GET['apiurl']) : '';
+$apiUrl = getTargetUrl();
 $params = $_GET;
-unset($params['apiurl']); // 移除 apiurl 参数
+if (isset($_GET['apiurl'])) {
+    unset($params['apiurl']); // 移除 apiurl 参数
+}
 
 // 构造请求地址
 if ($proxySwitch) {
@@ -450,9 +476,15 @@ function pinyin_convert($text) {
     
     // 简单替换一些常见汉字的首字母，实际应用需要完整的拼音库
     $pinyinMap = [
-        '自' => 'zi',
-        '己' => 'ji',
-        '搞' => 'gao',
+        '血' => 'xue',
+        '谜' => 'mi',
+        '拼' => 'pin',
+        '图' => 'tu',
+        '我' => 'wo',
+        '推' => 'tui',
+        '的' => 'de',
+        '孩' => 'hai',
+        '子' => 'zi'
     ];
     
     if (isset($pinyinMap[$firstChar])) {
@@ -466,5 +498,6 @@ function pinyin_convert($text) {
     
     // 默认返回
     return 'shipin';
+    //preg_replace('/[^a-zA-Z0-9]/', '', strtolower($text));
 }
 ?>
