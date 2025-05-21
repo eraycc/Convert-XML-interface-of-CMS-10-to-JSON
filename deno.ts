@@ -1,5 +1,5 @@
 // 配置
-const proxySwitch = true; // 是否使用代理
+const proxySwitch = false; // 是否使用代理
 const proxyUrl = 'https://yourproxyurl/'; // 代理地址
 const proxyUrlEncode = false; // 代理是否支持URL编码
 
