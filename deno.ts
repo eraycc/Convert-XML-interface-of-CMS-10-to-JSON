@@ -14,11 +14,10 @@ const userAgents = [
   "Mozilla/5.0 (Linux; Android 11; Pixel 3 XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Mobile Safari/537.36",
 ];
 
-// 辅助函数提取CDATA和普通文本
+// 辅助函数：提取CDATA和普通文本
 function getCdataValue(node: any): string {
   if (!node) return '';
   
-  // 在Deno的XML解析中，CDATA会直接作为文本内容
   if (typeof node === 'string') {
     return node.trim();
   }
@@ -30,13 +29,13 @@ function getCdataValue(node: any): string {
   return '';
 }
 
-// 辅助函数获取节点属性
+// 辅助函数：获取节点属性
 function getAttribute(node: any, attr: string): string {
   if (!node || !node['@']) return '';
   return node['@'][attr] || '';
 }
 
-// 辅助函数获取节点文本
+// 辅助函数：获取节点文本
 function getText(node: any): string {
   if (!node) return '';
   if (typeof node === 'string') return node.trim();
@@ -44,11 +43,10 @@ function getText(node: any): string {
   return '';
 }
 
-// 辅助函数简单拼音转换
+// 辅助函数：简单拼音转换
 function pinyinConvert(text: string): string {
   if (!text) return '';
   
-  // 这是一个非常简化的拼音转换，仅作示例
   const firstChar = text.charAt(0);
   
   const pinyinMap: Record<string, string> = {
@@ -67,24 +65,22 @@ function pinyinConvert(text: string): string {
     return pinyinMap[firstChar] + text.slice(1).replace(/\s+/g, '');
   }
   
-  // 如果是英文，直接返回小写
   if (/^[a-zA-Z]/.test(text)) {
     return text.toLowerCase().replace(/\s+/g, '');
   }
   
-  // 默认返回x开头
   return 'x' + text.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
 }
 
 // 处理视频列表
 function processVideoList(xmlData: any) {
-  const result: any = {
+  const result: Record<string, any> = {
     code: 1,
     msg: "数据列表",
     page: getAttribute(xmlData.rss.list, "page") || "1",
-    pagecount: parseInt(getAttribute(xmlData.rss.list, "pagecount") || 0,
+    pagecount: parseInt(getAttribute(xmlData.rss.list, "pagecount")) || 0,
     limit: getAttribute(xmlData.rss.list, "pagesize") || "20",
-    total: parseInt(getAttribute(xmlData.rss.list, "recordcount") || 0,
+    total: parseInt(getAttribute(xmlData.rss.list, "recordcount")) || 0,
     list: []
   };
 
@@ -95,7 +91,6 @@ function processVideoList(xmlData: any) {
     : [xmlData.rss.list.video];
 
   for (const video of videos) {
-    // 处理播放源
     let playFrom = '';
     let playUrl = '';
     
@@ -105,12 +100,10 @@ function processVideoList(xmlData: any) {
       playFrom = video.dl.dd['@'].flag;
     }
     
-    // 处理播放URL
     if (video.dl?.dd) {
       playUrl = getText(video.dl.dd);
     }
     
-    // 处理名称首字母
     const name = getText(video.name);
     let firstLetter = 'X';
     if (name) {
@@ -120,7 +113,7 @@ function processVideoList(xmlData: any) {
       }
     }
     
-    const item: any = {
+    const item: Record<string, any> = {
       vod_id: parseInt(getText(video.id)) || 0,
       type_id: parseInt(getText(video.tid)) || 0,
       type_id_1: 2,
@@ -214,7 +207,7 @@ function processVideoList(xmlData: any) {
 
 // 处理列表
 function processList(xmlData: any) {
-  const result: any = {
+  const result: Record<string, any> = {
     code: 1,
     msg: "数据列表",
     page: getAttribute(xmlData.rss.list, "page") || "1",
@@ -264,7 +257,7 @@ function processList(xmlData: any) {
 
 // 处理详情
 function processDetail(xmlData: any) {
-  const result: any = {
+  const result: Record<string, any> = {
     code: 1,
     msg: "数据列表",
     page: 1,
@@ -280,7 +273,6 @@ function processDetail(xmlData: any) {
       : [xmlData.rss.list.video];
 
     for (const video of videos) {
-      // 处理播放源
       let playFrom = '';
       let playUrl = '';
       
@@ -290,12 +282,10 @@ function processDetail(xmlData: any) {
         playFrom = video.dl.dd['@'].flag;
       }
       
-      // 处理播放URL
       if (video.dl?.dd) {
         playUrl = getText(video.dl.dd);
       }
       
-      // 处理名称首字母
       const name = getText(video.name);
       let firstLetter = 'X';
       if (name) {
@@ -305,7 +295,7 @@ function processDetail(xmlData: any) {
         }
       }
       
-      const item: any = {
+      const item: Record<string, any> = {
         vod_id: parseInt(getText(video.id)) || 0,
         type_id: parseInt(getText(video.tid)) || 0,
         type_id_1: 2,
@@ -415,7 +405,6 @@ async function handleRequest(request: Request): Promise<Response> {
     });
   }
   
-  // 构造请求地址
   let requestUrl;
   if (proxySwitch) {
     requestUrl = proxyUrlEncode 
@@ -425,17 +414,14 @@ async function handleRequest(request: Request): Promise<Response> {
     requestUrl = apiUrl;
   }
   
-  // 添加其他参数
   const queryString = new URLSearchParams(params).toString();
   if (queryString) {
     requestUrl += (requestUrl.includes('?') ? '&' : '?') + queryString;
   }
   
-  // 随机选择一个 UA
   const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
   
   try {
-    // 发送请求
     const response = await fetch(requestUrl, {
       headers: {
         'User-Agent': userAgent
@@ -447,11 +433,8 @@ async function handleRequest(request: Request): Promise<Response> {
     }
     
     const xmlText = await response.text();
-    
-    // 解析 XML
     const xmlData = await parse(xmlText);
     
-    // 根据 ac 参数处理不同的返回格式
     const ac = params.ac || '';
     let result;
     
@@ -489,4 +472,5 @@ async function handleRequest(request: Request): Promise<Response> {
 }
 
 // 启动服务器
+console.log("Server running at http://localhost:8000");
 serve(handleRequest);
