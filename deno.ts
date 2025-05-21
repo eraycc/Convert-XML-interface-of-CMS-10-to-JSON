@@ -14,7 +14,7 @@ const userAgents = [
   "Mozilla/5.0 (Linux; Android 11; Pixel 3 XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Mobile Safari/537.36",
 ];
 
-// 辅助函数：提取CDATA和普通文本
+// 辅助函数提取CDATA和普通文本
 function getCdataValue(node: any): string {
   if (!node) return '';
   
@@ -30,13 +30,13 @@ function getCdataValue(node: any): string {
   return '';
 }
 
-// 辅助函数：获取节点属性
+// 辅助函数获取节点属性
 function getAttribute(node: any, attr: string): string {
   if (!node || !node['@']) return '';
   return node['@'][attr] || '';
 }
 
-// 辅助函数：获取节点文本
+// 辅助函数获取节点文本
 function getText(node: any): string {
   if (!node) return '';
   if (typeof node === 'string') return node.trim();
@@ -44,7 +44,7 @@ function getText(node: any): string {
   return '';
 }
 
-// 辅助函数：简单拼音转换
+// 辅助函数简单拼音转换
 function pinyinConvert(text: string): string {
   if (!text) return '';
   
