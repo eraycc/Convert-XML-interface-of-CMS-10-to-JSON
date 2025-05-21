@@ -23,7 +23,7 @@
 
 ```php
 $proxySwitch = true;       // 是否使用代理 (true/false)
-$proxyUrl = 'https://ll.9sd.top/eraysafeapi666/';  // 代理地址
+$proxyUrl = 'https://yourproxyurl/';  // 代理地址
 $proxyUrlEncode = false;   // 代理是否支持URL编码 (true/false)
 ```
 
