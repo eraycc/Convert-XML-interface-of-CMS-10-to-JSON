@@ -1,6 +1,6 @@
 # Convert-XML-interface-of-CMS-10-to-JSON
 只需一个脚本，即可将cms10 xml格式接口转换成标准cms10 json格式接口，以供不支持xml格式的影视采集站使用json格式进行采集
-基于此思路搓了个cfworker和deno脚本，其他脚本也可据此自搓
+基于此思路搓了个cfworke和deno脚本（测试有问题，不管了PHP也很方便）
 
 # API 代理与转换脚本
 
@@ -43,6 +43,9 @@ yourdomain.com/script.php?apiurl=原始API地址&ac=请求类型&其他参数...
 - 其他参数: 将直接传递给原始 API
 
 ### 示例请求
+支持两种请求方式：
+- /script.php?apiurl=xmlapi地址&其他参数
+- /script.php/apiurl/xmlapi地址?其他参数
 
 1. 获取视频列表:
    ```
