@@ -34,6 +34,7 @@ $proxyUrlEncode = false;   // 代理是否支持URL编码 (true/false)
 
 ```
 yourdomain.com/script.php?apiurl=原始API地址&ac=请求类型&其他参数...
+yourdomain.com/script.php/apiurl/xmlapi地址?ac=xx&其他参数
 ```
 
 ### 参数说明
