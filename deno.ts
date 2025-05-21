@@ -2,34 +2,6 @@
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
 // 配置
-const proxySwitch = true; // 是否使用代理
-const proxyUrl = 'https://yourproxyurl/'; // 代理地址
-const proxyUrlEncode = false; // 代理是否支持URL编码
-
-// 常见浏览器 UA
-const userAgents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (iPad; CPU OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/
-// 配置
-const proxySwitch = true; // 是否使用代理
-const proxyUrl = 'https://yourproxyurl/'; // 代理地址
-const proxyUrlEncode = false; // 代理是否支持URL编码
-
-// 常见浏览器 UA
-const userAgents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (iPad; CPU OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/
-// 配置
 const proxySwitch = false; // 是否使用代理
 const proxyUrl = 'https://yourproxyurl/'; // 代理地址
 const proxyUrlEncode = false; // 代理是否支持URL编码
@@ -47,28 +19,18 @@ const userAgents = [
 ];
 
 // 辅助函数：提取CDATA和普通文本
-function getCdataValue(node: any): string {
+function getCdataValue(node: Element | null): string {
     if (!node) return '';
-    
-    // 转换为字符串，会自动处理CDATA
-    let value = String(node);
-    
-    // 去除可能的CDATA标记（以防万一）
-    value = value.replace(/<!\[CDATA\[|\]\]>/g, '');
-    
-    return value.trim();
+    return node.textContent.trim();
 }
 
 // 简单拼音转换函数
 function pinyinConvert(text: string): string {
-    // 这是一个非常简化的拼音转换，仅作示例
-    // 实际应用可能需要更复杂的拼音库
     text = text.trim();
     if (!text) return '';
     
     const firstChar = text[0];
     
-    // 简单替换一些常见汉字的首字母，实际应用需要完整的拼音库
     const pinyinMap: Record<string, string> = {
         '自': 'zi',
         '己': 'ji',
@@ -79,24 +41,26 @@ function pinyinConvert(text: string): string {
         return pinyinMap[firstChar] + text.slice(1).replace(/\s+/g, '');
     }
     
-    // 如果是英文，直接返回小写
     if (/^[a-zA-Z]/.test(text)) {
         return text.replace(/\s+/g, '').toLowerCase();
     }
     
-    // 默认返回
     return 'shipin';
 }
 
 // XML解析函数
-async function parseXml(xmlString: string): Promise<any> {
+async function parseXml(xmlString: string): Promise<Document> {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
     
+    if (!xmlDoc) {
+        throw new Error("Failed to parse XML document");
+    }
+    
     // 检查错误
-    const errors = xmlDoc.getElementsByTagName("parsererror");
-    if (errors.length > 0) {
-        throw new Error(`XML Parse Error: ${errors[0].textContent}`);
+    const parserError = xmlDoc.querySelector("parsererror");
+    if (parserError) {
+        throw new Error(`XML Parse Error: ${parserError.textContent}`);
     }
     
     return xmlDoc;
@@ -109,7 +73,7 @@ async function handleRequest(request: Request): Promise<Response> {
         const params = Object.fromEntries(url.searchParams.entries());
         
         const apiUrl = params.apiurl ? decodeURIComponent(params.apiurl) : '';
-        delete params.apiurl; // 移除 apiurl 参数
+        delete params.apiurl;
 
         // 构造请求地址
         let requestUrl = '';
@@ -205,8 +169,8 @@ async function handleRequest(request: Request): Promise<Response> {
 }
 
 async function processVideoList(xmlDoc: Document): Promise<any> {
-    const list = xmlDoc.getElementsByTagName("list")[0];
-    const videos = xmlDoc.getElementsByTagName("video");
+    const list = xmlDoc.querySelector("list");
+    const videos = xmlDoc.querySelectorAll("video");
     
     const result = {
         "code": 1,
@@ -219,35 +183,31 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
     };
 
     for (const video of videos) {
-        const name = getCdataValue(video.getElementsByTagName("name")[0]);
-        const dt = video.getElementsByTagName("dt")[0];
-        const dl = video.getElementsByTagName("dl")[0];
+        const name = getCdataValue(video.querySelector("name"));
+        const dt = video.querySelector("dt");
+        const dl = video.querySelector("dl");
         
         let playFrom = '';
         let playUrl = '';
         
-        // 处理播放源
         if (dt) {
             playFrom = getCdataValue(dt);
         } else if (dl) {
-            const dd = dl.getElementsByTagName("dd")[0];
+            const dd = dl.querySelector("dd");
             if (dd) {
                 playFrom = dd.getAttribute("flag") || '';
             }
         }
         
-        // 处理播放URL
         if (dl) {
-            const dd = dl.getElementsByTagName("dd")[0];
+            const dd = dl.querySelector("dd");
             if (dd) {
                 playUrl = getCdataValue(dd);
             }
         }
         
-        // 处理名称首字母
         let firstLetter = 'X';
         if (name) {
-            // 简化处理，实际可能需要更复杂的拼音转换
             firstLetter = name[0].toUpperCase();
             if (!/[A-Z]/.test(firstLetter)) {
                 firstLetter = 'X';
@@ -255,38 +215,38 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
         }
         
         const item = {
-            "vod_id": parseInt(video.getElementsByTagName("id")[0]?.textContent || "0"),
-            "type_id": parseInt(video.getElementsByTagName("tid")[0]?.textContent || "0"),
+            "vod_id": parseInt(video.querySelector("id")?.textContent || "0"),
+            "type_id": parseInt(video.querySelector("tid")?.textContent || "0"),
             "type_id_1": 2,
             "group_id": 0,
             "vod_name": name,
-            "vod_sub": getCdataValue(video.getElementsByTagName("des")[0]),
+            "vod_sub": getCdataValue(video.querySelector("des")),
             "vod_en": pinyinConvert(name),
             "vod_status": 1,
             "vod_letter": firstLetter,
             "vod_color": "",
             "vod_tag": "",
             "vod_class": "",
-            "vod_pic": getCdataValue(video.getElementsByTagName("pic")[0]),
+            "vod_pic": getCdataValue(video.querySelector("pic")),
             "vod_pic_thumb": "",
             "vod_pic_slide": "",
             "vod_pic_screenshot": "",
-            "vod_actor": getCdataValue(video.getElementsByTagName("actor")[0]),
-            "vod_director": getCdataValue(video.getElementsByTagName("director")[0]),
+            "vod_actor": getCdataValue(video.querySelector("actor")),
+            "vod_director": getCdataValue(video.querySelector("director")),
             "vod_writer": "",
             "vod_behind": "",
-            "vod_blurb": getCdataValue(video.getElementsByTagName("des")[0]),
-            "vod_remarks": getCdataValue(video.getElementsByTagName("note")[0]),
-            "vod_pubdate": getCdataValue(video.getElementsByTagName("year")[0]),
+            "vod_blurb": getCdataValue(video.querySelector("des")),
+            "vod_remarks": getCdataValue(video.querySelector("note")),
+            "vod_pubdate": getCdataValue(video.querySelector("year")),
             "vod_total": 0,
             "vod_serial": "0",
             "vod_tv": "",
             "vod_weekday": "",
-            "vod_area": getCdataValue(video.getElementsByTagName("area")[0]),
-            "vod_lang": getCdataValue(video.getElementsByTagName("lang")[0]),
-            "vod_year": getCdataValue(video.getElementsByTagName("year")[0]),
+            "vod_area": getCdataValue(video.querySelector("area")),
+            "vod_lang": getCdataValue(video.querySelector("lang")),
+            "vod_year": getCdataValue(video.querySelector("year")),
             "vod_version": "",
-            "vod_state": getCdataValue(video.getElementsByTagName("state")[0]),
+            "vod_state": getCdataValue(video.querySelector("state")),
             "vod_author": "",
             "vod_jumpurl": "",
             "vod_tpl": "",
@@ -309,7 +269,7 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
             "vod_score": "6.0",
             "vod_score_all": 7280,
             "vod_score_num": 728,
-            "vod_time": getCdataValue(video.getElementsByTagName("last")[0]),
+            "vod_time": getCdataValue(video.querySelector("last")),
             "vod_time_add": Math.floor(Date.now() / 1000),
             "vod_time_hits": 0,
             "vod_time_make": 0,
@@ -325,7 +285,7 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
             "vod_pwd_play_url": "",
             "vod_pwd_down": "",
             "vod_pwd_down_url": "",
-            "vod_content": getCdataValue(video.getElementsByTagName("des")[0]),
+            "vod_content": getCdataValue(video.querySelector("des")),
             "vod_play_from": playFrom,
             "vod_play_server": "",
             "vod_play_note": "",
@@ -337,7 +297,7 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
             "vod_plot": 0,
             "vod_plot_name": "",
             "vod_plot_detail": "",
-            "type_name": getCdataValue(video.getElementsByTagName("type")[0])
+            "type_name": getCdataValue(video.querySelector("type"))
         };
         
         result.list.push(item);
@@ -347,9 +307,9 @@ async function processVideoList(xmlDoc: Document): Promise<any> {
 }
 
 async function processList(xmlDoc: Document): Promise<any> {
-    const list = xmlDoc.getElementsByTagName("list")[0];
-    const videos = xmlDoc.getElementsByTagName("video");
-    const classTypes = xmlDoc.getElementsByTagName("ty");
+    const list = xmlDoc.querySelector("list");
+    const videos = xmlDoc.querySelectorAll("video");
+    const classTypes = xmlDoc.querySelectorAll("ty");
     
     const result = {
         "code": 1,
@@ -363,16 +323,16 @@ async function processList(xmlDoc: Document): Promise<any> {
     };
 
     for (const video of videos) {
-        const name = getCdataValue(video.getElementsByTagName("name")[0]);
+        const name = getCdataValue(video.querySelector("name"));
         result.list.push({
-            "vod_id": parseInt(video.getElementsByTagName("id")[0]?.textContent || "0"),
+            "vod_id": parseInt(video.querySelector("id")?.textContent || "0"),
             "vod_name": name,
-            "type_id": parseInt(video.getElementsByTagName("tid")[0]?.textContent || "0"),
-            "type_name": getCdataValue(video.getElementsByTagName("type")[0]),
+            "type_id": parseInt(video.querySelector("tid")?.textContent || "0"),
+            "type_name": getCdataValue(video.querySelector("type")),
             "vod_en": pinyinConvert(name),
-            "vod_time": getCdataValue(video.getElementsByTagName("last")[0]),
-            "vod_remarks": getCdataValue(video.getElementsByTagName("note")[0]),
-            "vod_play_from": getCdataValue(video.getElementsByTagName("dt")[0])
+            "vod_time": getCdataValue(video.querySelector("last")),
+            "vod_remarks": getCdataValue(video.querySelector("note")),
+            "vod_play_from": getCdataValue(video.querySelector("dt"))
         });
     }
 
@@ -380,7 +340,7 @@ async function processList(xmlDoc: Document): Promise<any> {
         result.class.push({
             "type_id": parseInt(type.getAttribute("id") || "0"),
             "type_pid": 0,
-            "type_name": getCdataValue(type)
+            "type_name": type.textContent.trim()
         });
     }
     
@@ -388,8 +348,8 @@ async function processList(xmlDoc: Document): Promise<any> {
 }
 
 async function processDetail(xmlDoc: Document): Promise<any> {
-    const list = xmlDoc.getElementsByTagName("list")[0];
-    const videos = xmlDoc.getElementsByTagName("video");
+    const list = xmlDoc.querySelector("list");
+    const videos = xmlDoc.querySelectorAll("video");
     
     const result = {
         "code": 1,
@@ -402,35 +362,31 @@ async function processDetail(xmlDoc: Document): Promise<any> {
     };
 
     for (const video of videos) {
-        const name = getCdataValue(video.getElementsByTagName("name")[0]);
-        const dt = video.getElementsByTagName("dt")[0];
-        const dl = video.getElementsByTagName("dl")[0];
+        const name = getCdataValue(video.querySelector("name"));
+        const dt = video.querySelector("dt");
+        const dl = video.querySelector("dl");
         
         let playFrom = '';
         let playUrl = '';
         
-        // 处理播放源
         if (dt) {
             playFrom = getCdataValue(dt);
         } else if (dl) {
-            const dd = dl.getElementsByTagName("dd")[0];
+            const dd = dl.querySelector("dd");
             if (dd) {
                 playFrom = dd.getAttribute("flag") || '';
             }
         }
         
-        // 处理播放URL
         if (dl) {
-            const dd = dl.getElementsByTagName("dd")[0];
+            const dd = dl.querySelector("dd");
             if (dd) {
                 playUrl = getCdataValue(dd);
             }
         }
         
-        // 处理名称首字母
         let firstLetter = 'X';
         if (name) {
-            // 简化处理，实际可能需要更复杂的拼音转换
             firstLetter = name[0].toUpperCase();
             if (!/[A-Z]/.test(firstLetter)) {
                 firstLetter = 'X';
@@ -438,8 +394,8 @@ async function processDetail(xmlDoc: Document): Promise<any> {
         }
         
         const item = {
-            "vod_id": parseInt(video.getElementsByTagName("id")[0]?.textContent || "0"),
-            "type_id": parseInt(video.getElementsByTagName("tid")[0]?.textContent || "0"),
+            "vod_id": parseInt(video.querySelector("id")?.textContent || "0"),
+            "type_id": parseInt(video.querySelector("tid")?.textContent || "0"),
             "type_id_1": 2,
             "group_id": 0,
             "vod_name": name,
@@ -450,26 +406,26 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_color": "",
             "vod_tag": "",
             "vod_class": "",
-            "vod_pic": getCdataValue(video.getElementsByTagName("pic")[0]),
+            "vod_pic": getCdataValue(video.querySelector("pic")),
             "vod_pic_thumb": "",
             "vod_pic_slide": "",
             "vod_pic_screenshot": "",
-            "vod_actor": getCdataValue(video.getElementsByTagName("actor")[0]),
-            "vod_director": getCdataValue(video.getElementsByTagName("director")[0]),
+            "vod_actor": getCdataValue(video.querySelector("actor")),
+            "vod_director": getCdataValue(video.querySelector("director")),
             "vod_writer": "",
             "vod_behind": "",
-            "vod_blurb": getCdataValue(video.getElementsByTagName("des")[0]),
-            "vod_remarks": getCdataValue(video.getElementsByTagName("note")[0]),
-            "vod_pubdate": getCdataValue(video.getElementsByTagName("year")[0]),
+            "vod_blurb": getCdataValue(video.querySelector("des")),
+            "vod_remarks": getCdataValue(video.querySelector("note")),
+            "vod_pubdate": getCdataValue(video.querySelector("year")),
             "vod_total": 0,
             "vod_serial": "0",
             "vod_tv": "",
             "vod_weekday": "",
-            "vod_area": getCdataValue(video.getElementsByTagName("area")[0]),
-            "vod_lang": getCdataValue(video.getElementsByTagName("lang")[0]),
-            "vod_year": getCdataValue(video.getElementsByTagName("year")[0]),
+            "vod_area": getCdataValue(video.querySelector("area")),
+            "vod_lang": getCdataValue(video.querySelector("lang")),
+            "vod_year": getCdataValue(video.querySelector("year")),
             "vod_version": "",
-            "vod_state": getCdataValue(video.getElementsByTagName("state")[0]),
+            "vod_state": getCdataValue(video.querySelector("state")),
             "vod_author": "",
             "vod_jumpurl": "",
             "vod_tpl": "",
@@ -492,7 +448,7 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_score": "6.0",
             "vod_score_all": 7280,
             "vod_score_num": 728,
-            "vod_time": getCdataValue(video.getElementsByTagName("last")[0]),
+            "vod_time": getCdataValue(video.querySelector("last")),
             "vod_time_add": Math.floor(Date.now() / 1000),
             "vod_time_hits": 0,
             "vod_time_make": 0,
@@ -508,7 +464,7 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_pwd_play_url": "",
             "vod_pwd_down": "",
             "vod_pwd_down_url": "",
-            "vod_content": getCdataValue(video.getElementsByTagName("des")[0]),
+            "vod_content": getCdataValue(video.querySelector("des")),
             "vod_play_from": playFrom,
             "vod_play_server": "",
             "vod_play_note": "",
@@ -520,7 +476,7 @@ async function processDetail(xmlDoc: Document): Promise<any> {
             "vod_plot": 0,
             "vod_plot_name": "",
             "vod_plot_detail": "",
-            "type_name": getCdataValue(video.getElementsByTagName("type")[0])
+            "type_name": getCdataValue(video.querySelector("type"))
         };
         
         result.list.push(item);
